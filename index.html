@@ -3,19 +3,58 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Multi-Touch Sine Synth</title>
+    <title>Guitar Lab Pro Synth</title>
     <style>
         body, html {
             margin: 0; padding: 0;
             width: 100%; height: 100%;
             overflow: hidden;
             background-color: #000;
-            font-family: sans-serif;
+            font-family: 'Malgun Gothic', sans-serif;
             user-select: none;
             -webkit-user-select: none;
-            touch-action: none; /* 브라우저 기본 터치 동작 방지 */
+            touch-action: none;
         }
         canvas { display: block; }
+
+        /* 왼쪽 상단 네이버 스타일 버튼 그룹 */
+        .controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 100;
+        }
+        .btn {
+            background-color: #03C75A; /* 네이버 그린 */
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: opacity 0.2s;
+        }
+        .btn.active {
+            outline: 2px solid white;
+            box-shadow: 0 0 10px rgba(3, 199, 90, 0.8);
+        }
+        .btn:active { opacity: 0.7; }
+
+        /* 오른쪽 상단 비주얼라이저 영역 */
+        #viz-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 150px;
+            height: 60px;
+            border: 1px solid #333;
+            background: rgba(0,0,0,0.5);
+            pointer-events: none;
+        }
+
         #watermark {
             position: absolute; bottom: 20px; width: 100%;
             text-align: center; color: rgba(255, 255, 255, 0.2);
@@ -26,28 +65,97 @@
 </head>
 <body>
 
-    <canvas id="canvas"></canvas>
+    <div class="controls">
+        <button class="btn active" onclick="setWave('sine', this)">SINE</button>
+        <button class="btn" onclick="setWave('triangle', this)">TRI</button>
+        <button class="btn" onclick="setWave('sawtooth', this)">SAW</button>
+        <button class="btn" onclick="setWave('square', this)">SQUR</button>
+    </div>
+
+    <div id="viz-container">
+        <canvas id="viz-canvas"></canvas>
+    </div>
+
+    <canvas id="main-canvas"></canvas>
     <div id="watermark">SONG, YOUNG-MIN Guitar Lab</div>
 
     <script>
-        const canvas = document.getElementById('canvas');
+        const canvas = document.getElementById('main-canvas');
         const ctx = canvas.getContext('2d');
+        const vizCanvas = document.getElementById('viz-canvas');
+        const vCtx = vizCanvas.getContext('2d');
         
         let audioCtx = null;
-        // 각 터치 정보를 저장할 객체 (Key: touch identifier)
+        let masterGain = null;
+        let analyser = null;
         const activeTouches = {};
+        let currentWaveType = 'sine';
 
+        // 1. 초기 설정 및 리사이즈
         function resize() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
+            vizCanvas.width = 150;
+            vizCanvas.height = 60;
             render();
         }
 
-        // 배경 그리드 및 모든 터치 포인트 그리기
+        function setWave(type, btn) {
+            currentWaveType = type;
+            document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        }
+
+        // 2. 오디오 및 분석기 초기화
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                masterGain = audioCtx.createGain();
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 256;
+                
+                masterGain.connect(analyser);
+                analyser.connect(audioCtx.destination);
+                
+                drawVisualizer(); // 루프 시작
+            }
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        // 3. 비주얼라이저 (오른쪽 상단 파형)
+        function drawVisualizer() {
+            requestAnimationFrame(drawVisualizer);
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            analyser.getByteTimeDomainData(dataArray);
+
+            vCtx.fillStyle = 'black';
+            vCtx.fillRect(0, 0, vizCanvas.width, vizCanvas.height);
+            vCtx.lineWidth = 2;
+            vCtx.strokeStyle = '#03C75A'; // 파형도 네이버 색상
+            vCtx.beginPath();
+
+            const sliceWidth = vizCanvas.width / bufferLength;
+            let x = 0;
+
+            for (let i = 0; i < bufferLength; i++) {
+                const v = dataArray[i] / 128.0;
+                const y = v * vizCanvas.height / 2;
+                if (i === 0) vCtx.moveTo(x, y);
+                else vCtx.lineTo(x, y);
+                x += sliceWidth;
+            }
+            vCtx.lineTo(vizCanvas.width, vizCanvas.height / 2);
+            vCtx.stroke();
+        }
+
+        function getFrequency(y) {
+            return ((canvas.height - y) / canvas.height) * (1200 - 80) + 80;
+        }
+
+        // 4. 메인 그리기 루프
         function render() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // 1. 그리드 그리기
             ctx.strokeStyle = '#222'; 
             ctx.lineWidth = 1;
             const step = 40;
@@ -58,64 +166,41 @@
                 ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
             }
 
-            // 2. 활성화된 모든 터치 지점에 원 그리기
             Object.values(activeTouches).forEach(touch => {
                 ctx.beginPath();
-                ctx.arc(touch.x, touch.y, 40, 0, Math.PI * 2);
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.arc(touch.x, touch.y, 45, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(3, 199, 90, 0.2)'; // 터치 원도 네이버 그린 계열
                 ctx.fill();
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-                ctx.lineWidth = 2;
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
                 ctx.stroke();
             });
         }
 
-        function initAudio() {
-            if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            }
-        }
-
-        function getFrequency(y) {
-            const minHz = 80;
-            const maxHz = 1000;
-            return ((canvas.height - y) / canvas.height) * (maxHz - minHz) + minHz;
-        }
-
-        // 터치 시작 시 오실레이터 생성
+        // 5. 터치 이벤트
         canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
             initAudio();
 
             for (let i = 0; i < e.changedTouches.length; i++) {
                 const t = e.changedTouches[i];
-                
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
                 
-                osc.type = 'sine';
+                osc.type = currentWaveType;
                 osc.frequency.setValueAtTime(getFrequency(t.clientY), audioCtx.currentTime);
                 
                 osc.connect(gain);
-                gain.connect(audioCtx.destination);
+                gain.connect(masterGain);
                 
                 gain.gain.setValueAtTime(0, audioCtx.currentTime);
-                gain.gain.linearRampToValueAtTime(0.2, audioCtx.currentTime + 0.05);
+                gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 0.05);
                 
                 osc.start();
-
-                // 터치 데이터 저장
-                activeTouches[t.identifier] = {
-                    x: t.clientX,
-                    y: t.clientY,
-                    osc: osc,
-                    gain: gain
-                };
+                activeTouches[t.identifier] = { x: t.clientX, y: t.clientY, osc: osc, gain: gain };
             }
             render();
         }, { passive: false });
 
-        // 터치 이동 시 주파수 및 위치 업데이트
         canvas.addEventListener('touchmove', (e) => {
             e.preventDefault();
             for (let i = 0; i < e.changedTouches.length; i++) {
@@ -130,16 +215,14 @@
             render();
         }, { passive: false });
 
-        // 터치 종료 시 해당 오실레이터만 정지
         const stopTouch = (e) => {
-            e.preventDefault();
             for (let i = 0; i < e.changedTouches.length; i++) {
                 const t = e.changedTouches[i];
                 const data = activeTouches[t.identifier];
                 if (data) {
                     data.gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.1);
                     data.osc.stop(audioCtx.currentTime + 0.12);
-                    delete activeTouches[t.identifier]; // 객체에서 삭제
+                    delete activeTouches[t.identifier];
                 }
             }
             render();
@@ -150,7 +233,6 @@
 
         window.addEventListener('resize', resize);
         resize();
-
     </script>
 </body>
 </html>
