@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Virtual Sine Synth</title>
+    <title>Dark Sine Synth</title>
     <style>
         body, html {
             margin: 0;
@@ -11,42 +11,47 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background-color: #f0f0f0;
+            /* 1. 배경색 블랙으로 변경 */
+            background-color: #000000;
             font-family: sans-serif;
+            user-select: none; /* 텍스트 선택 방지 */
+            -webkit-user-select: none;
         }
 
-        /* 눈금종이 배경을 그릴 캔버스 */
         #canvas {
             display: block;
         }
 
-        /* 워터마크 스타일 */
+        /* 워터마크 스타일 수정 (다크모드에 맞게) */
         #watermark {
             position: absolute;
             bottom: 20px;
             width: 100%;
             text-align: center;
-            color: rgba(0, 0, 0, 0.3);
+            color: rgba(255, 255, 255, 0.25); /* 연한 흰색 */
             font-weight: bold;
             letter-spacing: 2px;
-            pointer-events: none; /* 터치 방해 금지 */
+            pointer-events: none;
             font-size: 14px;
+            z-index: 10; /* 안내문구보다 위에 */
         }
 
-        /* 안내 문구 */
+        /* 안내 문구 스타일 수정 */
         #instruction {
             position: absolute;
             top: 20px;
             width: 100%;
             text-align: center;
-            color: #888;
+            color: rgba(255, 255, 255, 0.5);
             pointer-events: none;
+            font-size: 14px;
+            z-index: 10;
         }
     </style>
 </head>
 <body>
 
-    <div id="instruction">화면을 터치하고 위아래로 드래그해보세요</div>
+    <div id="instruction">화면을 터치하여 소리를 내보세요 (위: 고음, 아래: 저음)</div>
     <canvas id="canvas"></canvas>
     <div id="watermark">SONG, YOUNG-MIN Guitar Lab</div>
 
@@ -58,16 +63,26 @@
         let oscillator = null;
         let gainNode = null;
 
+        // 터치 위치 저장을 위한 변수
+        let currentTouchX = null;
+        let currentTouchY = null;
+        let isTouching = false;
+
         // 1. 화면 크기 및 그리드 설정
         function resize() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-            drawGrid();
+            draw(); // 리사이즈 시 그리드와 원을 다시 그림
         }
 
-        function drawGrid() {
+        // 통합 그리기 함수 (그리드 + 터치 원)
+        function draw() {
+            // 배경 지우기
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.strokeStyle = '#d1d1d1';
+            
+            // A. 모눈종이 그리기
+            // 1. 실선 색상 회색으로 변경
+            ctx.strokeStyle = '#333333'; 
             ctx.lineWidth = 1;
 
             const step = 40; // 눈금 간격
@@ -87,9 +102,23 @@
                 ctx.lineTo(canvas.width, y);
                 ctx.stroke();
             }
+
+            // B. 2. 터치 위치 동그라미 그리기
+            if (isTouching && currentTouchX !== null && currentTouchY !== null) {
+                ctx.beginPath();
+                // 반지름 35px의 반투명한 흰색 원
+                ctx.arc(currentTouchX, currentTouchY, 35, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                ctx.fill();
+                // 원 테두리
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.stroke();
+            }
         }
 
         window.addEventListener('resize', resize);
+        // 초기화
         resize();
 
         // 2. 오디오 초기화 함수
@@ -103,63 +132,123 @@
         function startSound(y) {
             initAudio();
             
+            // 이미 소리가 나고 있다면 중복 생성 방지
+            if (oscillator) return; 
+
             oscillator = audioCtx.createOscillator();
             gainNode = audioCtx.createGain();
             
-            oscillator.type = 'sine'; // 사인파 설정
+            oscillator.type = 'sine'; // 사인파
             
             updateFrequency(y);
 
             oscillator.connect(gainNode);
             gainNode.connect(audioCtx.destination);
             
-            // 클릭 시 팝 노이즈 방지를 위한 부드러운 시작
+            // 페이드 인 (팝 노이즈 방지)
             gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
-            gainNode.gain.linearRampToValueAtTime(0.2, audioCtx.currentTime + 0.05);
+            gainNode.gain.linearRampToValueAtTime(0.2, audioCtx.currentTime + 0.03);
             
             oscillator.start();
         }
 
         function updateFrequency(y) {
-            if (oscillator) {
-                // Y축 좌표를 주파수로 변환 (위로 갈수록 고음)
-                // 하단(height) = 100Hz, 상단(0) = 1100Hz 정도 범위
-                const minHz = 100;
-                const maxHz = 1100;
+            if (oscillator && audioCtx) {
+                // Y축 좌표를 주파수로 변환
+                const minHz = 80;   // 최하단 주파수
+                const maxHz = 1200;  // 최상단 주파수
                 const freq = ((canvas.height - y) / canvas.height) * (maxHz - minHz) + minHz;
-                oscillator.frequency.setTargetAtTime(freq, audioCtx.currentTime, 0.03);
+                
+                // 부드러운 주파수 이동
+                oscillator.frequency.setTargetAtTime(freq, audioCtx.currentTime, 0.02);
             }
         }
 
         function stopSound() {
-            if (gainNode) {
-                gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.1);
-                oscillator.stop(audioCtx.currentTime + 0.1);
+            if (oscillator && gainNode) {
+                // 페이드 아웃 후 정지
+                gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.05);
+                oscillator.stop(audioCtx.currentTime + 0.06);
                 oscillator = null;
+                gainNode = null;
             }
         }
 
-        // 4. 터치/마우스 이벤트 리스너
+        // 4. 터치 이벤트 리스너 (스마트폰용)
         canvas.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            const touchY = e.touches[0].clientY;
-            startSound(touchY);
+            e.preventDefault(); // 스크롤 등 기본 동작 방지
+            
+            initAudio(); // 터치 시작 시 오디오 컨텍스트 활성화 (iOS 대응)
+
+            isTouching = true;
+            // 첫 번째 터치 지점 저장
+            currentTouchX = e.touches[0].clientX;
+            currentTouchY = e.touches[0].clientY;
+            
+            startSound(currentTouchY);
+            draw(); // 원 그리기
         }, { passive: false });
 
         canvas.addEventListener('touchmove', (e) => {
             e.preventDefault();
-            const touchY = e.touches[0].clientY;
-            updateFrequency(touchY);
+            if(!isTouching) return;
+
+            // 터치 위치 업데이트
+            currentTouchX = e.touches[0].clientX;
+            currentTouchY = e.touches[0].clientY;
+            
+            updateFrequency(currentTouchY);
+            draw(); // 원 위치 이동
         }, { passive: false });
 
-        canvas.addEventListener('touchend', stopSound);
+        // 3. 멀티터치 오류 해결을 위한 핵심 부분
+        const handleTouchEnd = (e) => {
+            e.preventDefault();
+            
+            // e.touches.length는 현재 화면을 누르고 있는 "남은" 손가락의 개수입니다.
+            if (e.touches.length === 0) {
+                // 모든 손가락이 떼어졌을 때만 소리를 끄고 원을 지웁니다.
+                isTouching = false;
+                currentTouchX = null;
+                currentTouchY = null;
+                stopSound();
+                draw();
+            } else {
+                // 아직 손가락이 남아있다면, 첫 번째 남은 손가락을 기준으로 음을 유지합니다.
+                currentTouchX = e.touches[0].clientX;
+                currentTouchY = e.touches[0].clientY;
+                updateFrequency(currentTouchY);
+                draw();
+            }
+        };
 
-        // PC 테스트용 마우스 이벤트 추가
-        canvas.addEventListener('mousedown', (e) => startSound(e.clientY));
-        canvas.addEventListener('mousemove', (e) => {
-            if (oscillator) updateFrequency(e.clientY);
+        canvas.addEventListener('touchend', handleTouchEnd);
+        canvas.addEventListener('touchcancel', handleTouchEnd); // 시스템 팝업 등으로 터치가 취소될 때
+
+
+        // 5. PC 테스트용 마우스 이벤트 (선택 사항, 필요 없으면 삭제 가능)
+        canvas.addEventListener('mousedown', (e) => {
+            isTouching = true;
+            currentTouchX = e.clientX;
+            currentTouchY = e.clientY;
+            startSound(currentTouchY);
+            draw();
         });
-        canvas.addEventListener('mouseup', stopSound);
+        canvas.addEventListener('mousemove', (e) => {
+            if (isTouching) {
+                currentTouchX = e.clientX;
+                currentTouchY = e.clientY;
+                updateFrequency(currentTouchY);
+                draw();
+            }
+        });
+        canvas.addEventListener('mouseup', () => {
+            isTouching = false;
+            currentTouchX = null;
+            currentTouchY = null;
+            stopSound();
+            draw();
+        });
 
     </script>
 </body>
