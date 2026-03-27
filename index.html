@@ -3,15 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Guitar Lab - Neon Multi-Synth</title>
+    <title>Guitar Lab - Compact Neon Synth</title>
     <style>
         :root {
             --theme-color: #1B263B; 
             --text-light: #E0E0E0;
-            /* 기본 포인트 컬러 (SINE) */
-            --point-color: #00D4FF; 
-            /* 네온 효과를 위한 그림자 색상 */
-            --neon-glow: rgba(0, 212, 255, 0.8); 
+            --point-color: #00D4FF; /* 기본 SINE 색상 */
         }
         body, html {
             margin: 0; padding: 0;
@@ -25,32 +22,25 @@
         }
         canvas { display: block; }
 
-        /* 상단 컨트롤 영역 레이아웃 */
-        .controls-wrapper {
-            position: absolute; top: 15px; left: 15px;
-            display: flex; gap: 10px; z-index: 1000;
+        /* 상단 버튼 레이아웃 */
+        .top-controls {
+            position: absolute; top: 12px; left: 12px;
+            display: flex; gap: 6px; z-index: 1000;
         }
 
-        /* 공통 드롭다운 스타일 */
         .menu-container { position: relative; }
-        
-        .main-btn {
+
+        /* 버튼 크기 축소 (Compact) */
+        .compact-btn {
             background-color: var(--theme-color);
             color: var(--text-light);
             border: 1px solid #415A77;
-            padding: 10px 16px;
+            padding: 6px 10px; /* 크기 대폭 축소 */
             font-weight: bold;
-            border-radius: 8px;
-            font-size: 13px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-            display: flex; align-items: center; gap: 5px;
-        }
-        
-        /* 컬러 버튼에 현재 색상 표시 작은 원 */
-        #color-reflect {
-            width: 12px; height: 12px; border-radius: 50%;
-            background-color: var(--point-color);
-            box-shadow: 0 0 5px var(--point-color);
+            border-radius: 6px;
+            font-size: 11px;   /* 폰트 크기 축소 */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            display: flex; align-items: center; gap: 4px;
         }
 
         .menu-list {
@@ -58,58 +48,50 @@
             position: absolute; top: 100%; left: 0;
             background-color: #0D1B2A;
             border: 1px solid #333;
-            border-radius: 8px; margin-top: 5px; 
-            overflow: hidden; min-width: 130px;
+            border-radius: 6px; margin-top: 4px; overflow: hidden;
+            min-width: 100px;
         }
-        
         .menu-list button {
             background: none; border: none; color: #ccc;
-            padding: 12px 15px; text-align: left; font-size: 13px;
+            padding: 8px 12px; text-align: left; font-size: 11px;
             border-bottom: 1px solid #1B263B;
-            display: flex; align-items: center; gap: 8px;
         }
-        .menu-list button:last-child { border-bottom: none; }
-        
-        /* 활성화된 항목 스타일 */
         .menu-list button.active {
-            color: #fff; font-weight: bold;
+            color: var(--point-color); font-weight: bold;
             background-color: #1B263B;
         }
 
-        /* 오른쪽 상단 정보 영역 */
+        /* 우측 상단 정보 영역 */
         .info-panel {
-            position: absolute; top: 15px; right: 15px;
+            position: absolute; top: 12px; right: 12px;
             display: flex; flex-direction: column; align-items: flex-end;
-            gap: 5px; z-index: 100;
+            gap: 4px; z-index: 100;
         }
         #viz-container {
-            width: 120px; height: 50px;
+            width: 100px; height: 40px;
             border: 1px solid #333; background: rgba(0,0,0,0.8);
             border-radius: 4px; pointer-events: none;
-            /* 비주얼라이저에도 네온 효과 */
-            filter: drop-shadow(0 0 3px var(--neon-glow));
         }
         #hz-display {
             color: var(--point-color);
             font-size: 8pt; font-family: monospace;
-            text-align: right; line-height: 1.2;
-            text-shadow: 0 0 4px var(--neon-glow);
-            pointer-events: none;
+            text-align: right; line-height: 1.1;
+            text-shadow: 1px 1px 2px black;
         }
 
         #watermark {
-            position: absolute; bottom: 15px; width: 100%;
+            position: absolute; bottom: 12px; width: 100%;
             text-align: center; color: rgba(255, 255, 255, 0.15);
             font-weight: bold; letter-spacing: 1px;
-            pointer-events: none; font-size: 12px;
+            pointer-events: none; font-size: 10px;
         }
     </style>
 </head>
 <body>
 
-    <div class="controls-wrapper">
-        <div class="menu-container" id="wave-menu">
-            <button class="main-btn" onclick="toggleMenu('wave-list')">Wave: SINE ▼</button>
+    <div class="top-controls">
+        <div class="menu-container">
+            <button class="compact-btn" onclick="toggleMenu('wave-list')">WAVE ▼</button>
             <div id="wave-list" class="menu-list">
                 <button class="active" onclick="selectWave('sine', 'SINE')">SINE</button>
                 <button onclick="selectWave('triangle', 'TRI')">TRIANGLE</button>
@@ -118,23 +100,14 @@
             </div>
         </div>
 
-        <div class="menu-container" id="color-menu">
-            <button class="main-btn" onclick="toggleMenu('color-list')">
-                <div id="color-reflect"></div>Color ▼
-            </button>
+        <div class="menu-container">
+            <button class="compact-btn" onclick="toggleMenu('color-list')">COLOR ▼</button>
             <div id="color-list" class="menu-list">
-                <button class="active" onclick="selectColor(this, 'SINE')" data-color="#00D4FF" data-glow="rgba(0, 212, 255, 0.8)">
-                    <span style="width:10px;height:10px;border-radius:50%;background:#00D4FF;box-shadow:0 0 3px #00D4FF"></span>SINE
-                </button>
-                <button onclick="selectColor(this, 'LIME')" data-color="#39FF14" data-glow="rgba(57, 255, 20, 0.8)">
-                    <span style="width:10px;height:10px;border-radius:50%;background:#39FF14;box-shadow:0 0 3px #39FF14"></span>LIME
-                </button>
-                <button onclick="selectColor(this, 'PINK')" data-color="#FF007F" data-glow="rgba(255, 0, 127, 0.8)">
-                    <span style="width:10px;height:10px;border-radius:50%;background:#FF007F;box-shadow:0 0 3px #FF007F"></span>PINK
-                </button>
-                <button onclick="selectColor(this, 'SUN')" data-color="#FF8C00" data-glow="rgba(255, 140, 0, 0.8)">
-                    <span style="width:10px;height:10px;border-radius:50%;background:#FF8C00;box-shadow:0 0 3px #FF8C00"></span>SUN
-                </button>
+                <button onclick="selectColor('#00D4FF')">CYAN</button>
+                <button onclick="selectColor('#39FF14')">LIME</button>
+                <button onclick="selectColor('#FF007F')">PINK</button>
+                <button onclick="selectColor('#FFD700')">GOLD</button>
+                <button onclick="selectColor('#FF4500')">ORANGE</button>
             </div>
         </div>
     </div>
@@ -160,57 +133,34 @@
         const activeTouches = {};
         let currentWaveType = 'sine';
 
-        // 메뉴 토글 (ID를 받도록 수정)
-        function toggleMenu(listId) {
-            // 다른 열려있는 메뉴 닫기
-            document.querySelectorAll('.menu-list').forEach(list => {
-                if(list.id !== listId) list.style.display = 'none';
-            });
-            const list = document.getElementById(listId);
-            list.style.display = (list.style.display === 'flex') ? 'none' : 'flex';
+        function toggleMenu(id) {
+            const list = document.getElementById(id);
+            const isVisible = list.style.display === 'flex';
+            // 모든 리스트 닫기
+            document.querySelectorAll('.menu-list').forEach(m => m.style.display = 'none');
+            list.style.display = isVisible ? 'none' : 'flex';
         }
 
-        // Wave 선택 (기존 유지)
         function selectWave(type, label) {
             currentWaveType = type;
-            document.querySelector('#wave-menu .main-btn').innerText = `Wave: ${label} ▼`;
             document.querySelectorAll('#wave-list button').forEach(btn => {
                 btn.classList.remove('active');
-                if(btn.innerText.includes(label)) btn.classList.add('active');
+                if(btn.innerText === label) btn.classList.add('active');
             });
-            document.getElementById('wave-list').style.display = 'none';
+            toggleMenu('wave-list');
         }
 
-        // 컬러 선택 (신규 추가)
-        function selectColor(btnElement, label) {
-            const newColor = btnElement.getAttribute('data-color');
-            const newGlow = btnElement.getAttribute('data-glow');
-            
-            // CSS 변수 업데이트 (비주얼라이저, Hz 텍스트에 즉시 반영)
-            document.documentElement.style.setProperty('--point-color', newColor);
-            document.documentElement.style.setProperty('--neon-glow', newGlow);
-            
-            // 버튼 스타일 업데이트
-            document.querySelectorAll('#color-list button').forEach(btn => btn.classList.remove('active'));
-            btnElement.classList.add('active');
-            document.getElementById('color-list').style.display = 'none';
-            
-            // 메인 화면 다시 그리도록 호출 (터치 원 색상 변경)
+        function selectColor(hex) {
+            document.documentElement.style.setProperty('--point-color', hex);
+            toggleMenu('color-list');
             render();
         }
-
-        // 화면 바깥 터치 시 메뉴 닫기
-        window.addEventListener('click', function(e) {
-            if (!e.target.matches('.main-btn') && !e.target.matches('.main-btn *')) {
-                document.querySelectorAll('.menu-list').forEach(list => list.style.display = 'none');
-            }
-        });
 
         function resize() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-            vizCanvas.width = 120;
-            vizCanvas.height = 50;
+            vizCanvas.width = 100;
+            vizCanvas.height = 40;
             render();
         }
 
@@ -229,7 +179,6 @@
 
         function updateLoop() {
             requestAnimationFrame(updateLoop);
-            
             const bufferLength = analyser.frequencyBinCount;
             const dataArray = new Uint8Array(bufferLength);
             analyser.getByteTimeDomainData(dataArray);
@@ -237,8 +186,7 @@
             vCtx.fillStyle = '#000';
             vCtx.fillRect(0, 0, vizCanvas.width, vizCanvas.height);
             vCtx.lineWidth = 2;
-            // CSS 변수에서 색상을 가져옴
-            vCtx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--point-color').trim(); 
+            vCtx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--point-color'); 
             vCtx.beginPath();
             const sliceWidth = vizCanvas.width / bufferLength;
             let x = 0;
@@ -253,13 +201,9 @@
             vCtx.stroke();
 
             const touchArray = Object.values(activeTouches);
-            if (touchArray.length > 0) {
-                hzDisplay.innerHTML = touchArray
-                    .map((t, i) => `T${i+1}: ${Math.round(t.hz)}Hz`)
-                    .join('<br>');
-            } else {
-                hzDisplay.innerHTML = "";
-            }
+            hzDisplay.innerHTML = touchArray.length > 0 
+                ? touchArray.map((t, i) => `T${i+1}: ${Math.round(t.hz)}Hz`).join('<br>') 
+                : "";
         }
 
         function getFrequency(y) {
@@ -268,69 +212,45 @@
 
         function render() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // 배경 그리드
-            ctx.strokeStyle = '#181818'; // 그리드는 아주 어둡게
+            ctx.strokeStyle = '#222'; 
             ctx.lineWidth = 1;
-            // 네온 효과가 그리드에는 영향을 주지 않도록 그림자 초기화
-            ctx.shadowBlur = 0; 
-
-            const step = 40;
-            for (let x = 0; x <= canvas.width; x += step) {
+            for (let x = 0; x <= canvas.width; x += 40) {
                 ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
             }
-            for (let y = 0; y <= canvas.height; y += step) {
+            for (let y = 0; y <= canvas.height; y += 40) {
                 ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
             }
 
-            // CSS 변수에서 현재 네온 색상 가져오기
-            const styles = getComputedStyle(document.documentElement);
-            const pointColor = styles.getPropertyValue('--point-color').trim();
-            const glowColor = styles.getPropertyValue('--neon-glow').trim();
+            const pColor = getComputedStyle(document.documentElement).getPropertyValue('--point-color');
 
-            // 터치되는 손 표시 (네온 효과 적용)
             Object.values(activeTouches).forEach(touch => {
-                ctx.save(); // 현재 상태 저장
-
-                // --- 네온 GOW 효과 설정 ---
-                ctx.shadowColor = glowColor; // 그림자 색상
-                ctx.shadowBlur = 15;          // 빛의 퍼짐 정도
-
-                // 1. 원 채우기 (반투명)
                 ctx.beginPath();
-                ctx.arc(touch.x, touch.y, 40, 0, Math.PI * 2);
-                ctx.fillStyle = pointColor.replace('rgb', 'rgba').replace(')', ', 0.15)'); // 아주 연하게 채움
+                ctx.arc(touch.x, touch.y, 35, 0, Math.PI * 2);
+                // 불투명 형광 컬러 적용 (알파값 0.8로 진하게)
+                ctx.fillStyle = pColor; 
+                ctx.globalAlpha = 0.8;
                 ctx.fill();
-
-                // 2. 원 테두리 (진하게, 빛남)
-                ctx.lineWidth = 3;
-                ctx.strokeStyle = pointColor; 
+                ctx.globalAlpha = 1.0;
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
                 ctx.stroke();
-
-                ctx.restore(); // 그림자 설정을 원상복구
             });
         }
 
         canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            // 메뉴가 열려있다면 닫음
-            document.querySelectorAll('.menu-list').forEach(list => list.style.display = 'none');
-            
             initAudio();
             for (let i = 0; i < e.changedTouches.length; i++) {
                 const t = e.changedTouches[i];
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
                 const freq = getFrequency(t.clientY);
-                
                 osc.type = currentWaveType;
                 osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
                 osc.connect(gain);
                 gain.connect(masterGain);
-                
                 gain.gain.setValueAtTime(0, audioCtx.currentTime);
                 gain.gain.linearRampToValueAtTime(0.25, audioCtx.currentTime + 0.04);
-                
                 osc.start();
                 activeTouches[t.identifier] = { x: t.clientX, y: t.clientY, hz: freq, osc: osc, gain: gain };
             }
@@ -344,9 +264,7 @@
                 const data = activeTouches[t.identifier];
                 if (data) {
                     const freq = getFrequency(t.clientY);
-                    data.x = t.clientX;
-                    data.y = t.clientY;
-                    data.hz = freq;
+                    data.x = t.clientX; data.y = t.clientY; data.hz = freq;
                     data.osc.frequency.setTargetAtTime(freq, audioCtx.currentTime, 0.03);
                 }
             }
@@ -368,7 +286,6 @@
 
         canvas.addEventListener('touchend', stopTouch);
         canvas.addEventListener('touchcancel', stopTouch);
-
         window.addEventListener('resize', resize);
         resize();
     </script>
