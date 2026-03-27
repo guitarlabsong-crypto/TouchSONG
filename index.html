@@ -2,14 +2,13 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Guitar Lab - Multi-Hz Synth</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Guitar Lab - Multi-Hz Synth Pro</title>
     <style>
         :root {
-            /* 7행: 다크 네이비 테마 색상 */
             --theme-color: #1B263B; 
             --text-light: #E0E0E0;
-            --point-color: #00D4FF; /* 파형 및 수치 포인트 컬러 */
+            --point-color: #00D4FF; 
         }
         body, html {
             margin: 0; padding: 0;
@@ -17,16 +16,18 @@
             overflow: hidden;
             background-color: #000;
             font-family: sans-serif;
+            /* 중요: 브라우저 기본 터치 액션을 완전히 비활성화 */
+            touch-action: none; 
             user-select: none;
             -webkit-user-select: none;
-            touch-action: none;
         }
-        canvas { display: block; }
+        canvas { 
+            display: block; 
+            touch-action: none; /* 캔버스 영역 터치 강제 고정 */
+        }
 
-        /* 드롭다운 메뉴 */
-        .menu-container {
-            position: absolute; top: 15px; left: 15px; z-index: 1000;
-        }
+        /* 메뉴 및 정보 레이아웃 유지 */
+        .menu-container { position: absolute; top: 15px; left: 15px; z-index: 1000; }
         #menu-btn {
             background-color: var(--theme-color);
             color: var(--text-light);
@@ -35,7 +36,6 @@
             font-weight: bold;
             border-radius: 8px;
             font-size: 14px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
         .menu-list {
             display: none; flex-direction: column;
@@ -53,7 +53,6 @@
             background-color: #1B263B;
         }
 
-        /* 우측 상단 정보 영역 (그래프 + Hz 수치) */
         .info-panel {
             position: absolute; top: 15px; right: 15px;
             display: flex; flex-direction: column; align-items: flex-end;
@@ -62,17 +61,14 @@
         #viz-container {
             width: 120px; height: 50px;
             border: 1px solid #333; background: rgba(0,0,0,0.8);
-            border-radius: 4px; pointer-events: none;
+            border-radius: 4px;
         }
-        /* 주파수 수치 표시 스타일 */
         #hz-display {
             color: var(--point-color);
-            font-size: 8pt; /* 요청하신 8pt 크기 */
+            font-size: 8pt;
             font-family: monospace;
             text-align: right;
             line-height: 1.2;
-            text-shadow: 1px 1px 2px black;
-            pointer-events: none;
         }
 
         #watermark {
@@ -86,7 +82,7 @@
 <body>
 
     <div class="menu-container">
-        <button id="menu-btn" onclick="toggleMenu()">Wave: SINE ▼</button>
+        <button id="menu-btn" onclick="toggleMenu(event)">Wave: SINE ▼</button>
         <div id="menu-list" class="menu-list">
             <button class="active" onclick="selectWave('sine', 'SINE')">SINE</button>
             <button onclick="selectWave('triangle', 'TRI')">TRIANGLE</button>
@@ -96,9 +92,7 @@
     </div>
 
     <div class="info-panel">
-        <div id="viz-container">
-            <canvas id="viz-canvas"></canvas>
-        </div>
+        <div id="viz-container"><canvas id="viz-canvas"></canvas></div>
         <div id="hz-display"></div>
     </div>
 
@@ -118,7 +112,8 @@
         const activeTouches = {};
         let currentWaveType = 'sine';
 
-        function toggleMenu() {
+        function toggleMenu(e) {
+            e.stopPropagation(); // 터치 이벤트 전파 방지
             const list = document.getElementById('menu-list');
             list.style.display = (list.style.display === 'flex') ? 'none' : 'flex';
         }
@@ -130,7 +125,7 @@
                 btn.classList.remove('active');
                 if(btn.innerText.includes(label)) btn.classList.add('active');
             });
-            toggleMenu();
+            document.getElementById('menu-list').style.display = 'none';
         }
 
         function resize() {
@@ -154,11 +149,8 @@
             if (audioCtx.state === 'suspended') audioCtx.resume();
         }
 
-        // 통합 업데이트 루프 (비주얼라이저 + Hz 텍스트)
         function updateLoop() {
             requestAnimationFrame(updateLoop);
-            
-            // 1. 파형 그리기
             const bufferLength = analyser.frequencyBinCount;
             const dataArray = new Uint8Array(bufferLength);
             analyser.getByteTimeDomainData(dataArray);
@@ -180,16 +172,10 @@
             vCtx.lineTo(vizCanvas.width, vizCanvas.height / 2);
             vCtx.stroke();
 
-            // 2. Hz 수치 업데이트
             const touchArray = Object.values(activeTouches);
-            if (touchArray.length > 0) {
-                // 여러 손가락일 경우 줄바꿈하여 표시
-                hzDisplay.innerHTML = touchArray
-                    .map((t, i) => `Touch ${i+1}: ${Math.round(t.hz)}Hz`)
-                    .join('<br>');
-            } else {
-                hzDisplay.innerHTML = "";
-            }
+            hzDisplay.innerHTML = touchArray.length > 0 
+                ? touchArray.map((t, i) => `T${i+1}: ${Math.round(t.hz)}Hz`).join('<br>') 
+                : "";
         }
 
         function getFrequency(y) {
@@ -200,29 +186,32 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.strokeStyle = '#222'; 
             ctx.lineWidth = 1;
-            const step = 40;
-            for (let x = 0; x <= canvas.width; x += step) {
+            for (let x = 0; x <= canvas.width; x += 40) {
                 ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
             }
-            for (let y = 0; y <= canvas.height; y += step) {
+            for (let y = 0; y <= canvas.height; y += 40) {
                 ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
             }
-
             Object.values(activeTouches).forEach(touch => {
                 ctx.beginPath();
                 ctx.arc(touch.x, touch.y, 40, 0, Math.PI * 2);
-                ctx.fillStyle = 'rgba(0, 212, 255, 0.2)'; 
+                ctx.fillStyle = 'rgba(0, 212, 255, 0.25)'; 
                 ctx.fill();
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
                 ctx.stroke();
             });
         }
 
-        canvas.addEventListener('touchstart', (e) => {
+        // 터치 인식 강화 핵심 로직
+        const handleStart = (e) => {
             e.preventDefault();
+            e.stopPropagation(); // 상위 제스처 방해 금지
             initAudio();
+
             for (let i = 0; i < e.changedTouches.length; i++) {
                 const t = e.changedTouches[i];
+                if (activeTouches[t.identifier]) continue;
+
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
                 const freq = getFrequency(t.clientY);
@@ -239,9 +228,9 @@
                 activeTouches[t.identifier] = { x: t.clientX, y: t.clientY, hz: freq, osc: osc, gain: gain };
             }
             render();
-        }, { passive: false });
+        };
 
-        canvas.addEventListener('touchmove', (e) => {
+        const handleMove = (e) => {
             e.preventDefault();
             for (let i = 0; i < e.changedTouches.length; i++) {
                 const t = e.changedTouches[i];
@@ -255,9 +244,10 @@
                 }
             }
             render();
-        }, { passive: false });
+        };
 
-        const stopTouch = (e) => {
+        const handleEnd = (e) => {
+            e.preventDefault();
             for (let i = 0; i < e.changedTouches.length; i++) {
                 const t = e.changedTouches[i];
                 const data = activeTouches[t.identifier];
@@ -270,8 +260,11 @@
             render();
         };
 
-        canvas.addEventListener('touchend', stopTouch);
-        canvas.addEventListener('touchcancel', stopTouch);
+        // 이벤트 리스너 등록 (passive: false 중요)
+        canvas.addEventListener('touchstart', handleStart, { passive: false });
+        canvas.addEventListener('touchmove', handleMove, { passive: false });
+        canvas.addEventListener('touchend', handleEnd, { passive: false });
+        canvas.addEventListener('touchcancel', handleEnd, { passive: false });
 
         window.addEventListener('resize', resize);
         resize();
