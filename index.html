@@ -3,73 +3,97 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Guitar Lab Pro Synth</title>
+    <title>Guitar Lab - Mobile Synth</title>
     <style>
+        :root {
+            --naver-green: #03C75A;
+        }
         body, html {
             margin: 0; padding: 0;
             width: 100%; height: 100%;
             overflow: hidden;
             background-color: #000;
-            font-family: 'Malgun Gothic', sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             user-select: none;
             -webkit-user-select: none;
             touch-action: none;
         }
         canvas { display: block; }
 
-        /* 왼쪽 상단 네이버 스타일 버튼 그룹 */
-        .controls {
+        /* 드롭다운 메뉴 스타일 */
+        .menu-container {
             position: absolute;
-            top: 20px;
-            left: 20px;
-            display: flex;
-            gap: 10px;
-            z-index: 100;
+            top: 15px;
+            left: 15px;
+            z-index: 1000;
         }
-        .btn {
-            background-color: #03C75A; /* 네이버 그린 */
+        #menu-btn {
+            background-color: var(--naver-green);
             color: white;
             border: none;
-            padding: 10px 15px;
+            padding: 10px 16px;
             font-weight: bold;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-            transition: opacity 0.2s;
+            border-radius: 8px;
+            font-size: 14px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
-        .btn.active {
-            outline: 2px solid white;
-            box-shadow: 0 0 10px rgba(3, 199, 90, 0.8);
+        .menu-list {
+            display: none; /* 기본은 숨김 */
+            flex-direction: column;
+            background-color: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            margin-top: 5px;
+            overflow: hidden;
         }
-        .btn:active { opacity: 0.7; }
+        .menu-list button {
+            background: none;
+            border: none;
+            color: #ccc;
+            padding: 12px 20px;
+            text-align: left;
+            font-size: 14px;
+            border-bottom: 1px solid #333;
+        }
+        .menu-list button:last-child { border-bottom: none; }
+        .menu-list button.active {
+            color: var(--naver-green);
+            font-weight: bold;
+            background-color: #262626;
+        }
 
-        /* 오른쪽 상단 비주얼라이저 영역 */
+        /* 우측 상단 비주얼라이저 */
         #viz-container {
             position: absolute;
-            top: 20px;
-            right: 20px;
-            width: 150px;
-            height: 60px;
+            top: 15px;
+            right: 15px;
+            width: 120px; /* 세로화면 고려하여 약간 축소 */
+            height: 50px;
             border: 1px solid #333;
-            background: rgba(0,0,0,0.5);
+            background: rgba(0,0,0,0.7);
+            border-radius: 4px;
             pointer-events: none;
+            z-index: 100;
         }
 
         #watermark {
-            position: absolute; bottom: 20px; width: 100%;
-            text-align: center; color: rgba(255, 255, 255, 0.2);
-            font-weight: bold; letter-spacing: 2px;
-            pointer-events: none; font-size: 14px;
+            position: absolute; bottom: 15px; width: 100%;
+            text-align: center; color: rgba(255, 255, 255, 0.15);
+            font-weight: bold; letter-spacing: 1px;
+            pointer-events: none; font-size: 12px;
         }
     </style>
 </head>
 <body>
 
-    <div class="controls">
-        <button class="btn active" onclick="setWave('sine', this)">SINE</button>
-        <button class="btn" onclick="setWave('triangle', this)">TRI</button>
-        <button class="btn" onclick="setWave('sawtooth', this)">SAW</button>
-        <button class="btn" onclick="setWave('square', this)">SQUR</button>
+    <div class="menu-container">
+        <button id="menu-btn" onclick="toggleMenu()">Wave: SINE ▼</button>
+        <div id="menu-list" class="menu-list">
+            <button class="active" onclick="selectWave('sine', 'SINE')">SINE (순수함)</button>
+            <button onclick="selectWave('triangle', 'TRI')">TRIANGLE (부드러움)</button>
+            <button onclick="selectWave('sawtooth', 'SAW')">SAWTOOTH (날카로움)</button>
+            <button onclick="selectWave('square', 'SQUR')">SQUARE (레트로)</button>
+        </div>
     </div>
 
     <div id="viz-container">
@@ -91,53 +115,61 @@
         const activeTouches = {};
         let currentWaveType = 'sine';
 
-        // 1. 초기 설정 및 리사이즈
+        // 메뉴 토글 함수
+        function toggleMenu() {
+            const list = document.getElementById('menu-list');
+            list.style.display = (list.style.display === 'flex') ? 'none' : 'flex';
+        }
+
+        // 파형 선택 함수
+        function selectWave(type, label) {
+            currentWaveType = type;
+            document.getElementById('menu-btn').innerText = `Wave: ${label} ▼`;
+            
+            // 버튼 활성화 스타일 관리
+            document.querySelectorAll('.menu-list button').forEach(btn => {
+                btn.classList.remove('active');
+                if(btn.innerText.includes(label)) btn.classList.add('active');
+            });
+            
+            toggleMenu(); // 선택 후 메뉴 닫기
+        }
+
         function resize() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-            vizCanvas.width = 150;
-            vizCanvas.height = 60;
+            vizCanvas.width = 120;
+            vizCanvas.height = 50;
             render();
         }
 
-        function setWave(type, btn) {
-            currentWaveType = type;
-            document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-        }
-
-        // 2. 오디오 및 분석기 초기화
         function initAudio() {
             if (!audioCtx) {
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 masterGain = audioCtx.createGain();
                 analyser = audioCtx.createAnalyser();
                 analyser.fftSize = 256;
-                
                 masterGain.connect(analyser);
                 analyser.connect(audioCtx.destination);
-                
-                drawVisualizer(); // 루프 시작
+                drawVisualizer();
             }
             if (audioCtx.state === 'suspended') audioCtx.resume();
         }
 
-        // 3. 비주얼라이저 (오른쪽 상단 파형)
         function drawVisualizer() {
             requestAnimationFrame(drawVisualizer);
             const bufferLength = analyser.frequencyBinCount;
             const dataArray = new Uint8Array(bufferLength);
             analyser.getByteTimeDomainData(dataArray);
 
-            vCtx.fillStyle = 'black';
+            vCtx.fillStyle = '#000';
             vCtx.fillRect(0, 0, vizCanvas.width, vizCanvas.height);
             vCtx.lineWidth = 2;
-            vCtx.strokeStyle = '#03C75A'; // 파형도 네이버 색상
+            vCtx.strokeStyle = '#03C75A'; 
             vCtx.beginPath();
 
             const sliceWidth = vizCanvas.width / bufferLength;
             let x = 0;
-
             for (let i = 0; i < bufferLength; i++) {
                 const v = dataArray[i] / 128.0;
                 const y = v * vizCanvas.height / 2;
@@ -150,10 +182,9 @@
         }
 
         function getFrequency(y) {
-            return ((canvas.height - y) / canvas.height) * (1200 - 80) + 80;
+            return ((canvas.height - y) / canvas.height) * (1100 - 80) + 80;
         }
 
-        // 4. 메인 그리기 루프
         function render() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.strokeStyle = '#222'; 
@@ -168,21 +199,21 @@
 
             Object.values(activeTouches).forEach(touch => {
                 ctx.beginPath();
-                ctx.arc(touch.x, touch.y, 45, 0, Math.PI * 2);
-                ctx.fillStyle = 'rgba(3, 199, 90, 0.2)'; // 터치 원도 네이버 그린 계열
+                ctx.arc(touch.x, touch.y, 40, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(3, 199, 90, 0.25)'; 
                 ctx.fill();
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
                 ctx.stroke();
             });
         }
 
-        // 5. 터치 이벤트
         canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
             initAudio();
 
             for (let i = 0; i < e.changedTouches.length; i++) {
                 const t = e.changedTouches[i];
+                // 메뉴 영역 터치 시 소리 안 나게 예외 처리 가능 (여기서는 단순화)
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
                 
@@ -193,7 +224,7 @@
                 gain.connect(masterGain);
                 
                 gain.gain.setValueAtTime(0, audioCtx.currentTime);
-                gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 0.05);
+                gain.gain.linearRampToValueAtTime(0.25, audioCtx.currentTime + 0.04);
                 
                 osc.start();
                 activeTouches[t.identifier] = { x: t.clientX, y: t.clientY, osc: osc, gain: gain };
