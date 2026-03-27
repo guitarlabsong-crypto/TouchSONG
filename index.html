@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Virtual Sine Synth</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #f0f0f0;
+            font-family: sans-serif;
+        }
+
+        /* 눈금종이 배경을 그릴 캔버스 */
+        #canvas {
+            display: block;
+        }
+
+        /* 워터마크 스타일 */
+        #watermark {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            text-align: center;
+            color: rgba(0, 0, 0, 0.3);
+            font-weight: bold;
+            letter-spacing: 2px;
+            pointer-events: none; /* 터치 방해 금지 */
+            font-size: 14px;
+        }
+
+        /* 안내 문구 */
+        #instruction {
+            position: absolute;
+            top: 20px;
+            width: 100%;
+            text-align: center;
+            color: #888;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="instruction">화면을 터치하고 위아래로 드래그해보세요</div>
+    <canvas id="canvas"></canvas>
+    <div id="watermark">SONG, YOUNG-MIN Guitar Lab</div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        let audioCtx = null;
+        let oscillator = null;
+        let gainNode = null;
+
+        // 1. 화면 크기 및 그리드 설정
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            drawGrid();
+        }
+
+        function drawGrid() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = '#d1d1d1';
+            ctx.lineWidth = 1;
+
+            const step = 40; // 눈금 간격
+
+            // 세로선
+            for (let x = 0; x <= canvas.width; x += step) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+
+            // 가로선
+            for (let y = 0; y <= canvas.height; y += step) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+        }
+
+        window.addEventListener('resize', resize);
+        resize();
+
+        // 2. 오디오 초기화 함수
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        // 3. 소리 제어 로직
+        function startSound(y) {
+            initAudio();
+            
+            oscillator = audioCtx.createOscillator();
+            gainNode = audioCtx.createGain();
+            
+            oscillator.type = 'sine'; // 사인파 설정
+            
+            updateFrequency(y);
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            // 클릭 시 팝 노이즈 방지를 위한 부드러운 시작
+            gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.2, audioCtx.currentTime + 0.05);
+            
+            oscillator.start();
+        }
+
+        function updateFrequency(y) {
+            if (oscillator) {
+                // Y축 좌표를 주파수로 변환 (위로 갈수록 고음)
+                // 하단(height) = 100Hz, 상단(0) = 1100Hz 정도 범위
+                const minHz = 100;
+                const maxHz = 1100;
+                const freq = ((canvas.height - y) / canvas.height) * (maxHz - minHz) + minHz;
+                oscillator.frequency.setTargetAtTime(freq, audioCtx.currentTime, 0.03);
+            }
+        }
+
+        function stopSound() {
+            if (gainNode) {
+                gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.1);
+                oscillator.stop(audioCtx.currentTime + 0.1);
+                oscillator = null;
+            }
+        }
+
+        // 4. 터치/마우스 이벤트 리스너
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touchY = e.touches[0].clientY;
+            startSound(touchY);
+        }, { passive: false });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const touchY = e.touches[0].clientY;
+            updateFrequency(touchY);
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', stopSound);
+
+        // PC 테스트용 마우스 이벤트 추가
+        canvas.addEventListener('mousedown', (e) => startSound(e.clientY));
+        canvas.addEventListener('mousemove', (e) => {
+            if (oscillator) updateFrequency(e.clientY);
+        });
+        canvas.addEventListener('mouseup', stopSound);
+
+    </script>
+</body>
+</html>
